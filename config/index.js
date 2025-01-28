@@ -8,7 +8,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:3069',
+        url: 'http://localhost:3013',
       },
     ],
   },

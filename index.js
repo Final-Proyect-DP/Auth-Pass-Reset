@@ -7,7 +7,7 @@ const passwordResetRoutes = require('./routes/passwordResetRoutes');
 const { swaggerOptions } = require('./config');
 
 const app = express();
-const port = process.env.PORT || 3069;
+const port = process.env.PORT || 3000;
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
