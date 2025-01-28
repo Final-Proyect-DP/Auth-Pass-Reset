@@ -4,10 +4,11 @@ const kafka = new Kafka({ brokers: [process.env.KAFKA_BROKER] });
 const producer = kafka.producer();
 
 const encryptMessage = (message) => {
-  const cipher = crypto.createCipher('aes-256-cbc', process.env.ENCRYPTION_KEY);
+  const iv = Buffer.from(process.env.ENCRYPTION_IV, 'hex');
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(process.env.ENCRYPTION_KEY, 'hex'), iv);
   let encrypted = cipher.update(JSON.stringify(message), 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  return { iv: iv.toString('hex'), encryptedData: encrypted };
 };
 
 const sendMessage = async (message) => {
@@ -16,7 +17,7 @@ const sendMessage = async (message) => {
   await producer.send({
     topic: process.env.KAFKA_TOPIC,
     messages: [
-      { value: encryptedMessage },
+      { value: JSON.stringify(encryptedMessage) },
     ],
   });
   await producer.disconnect();
