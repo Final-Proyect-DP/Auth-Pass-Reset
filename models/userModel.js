@@ -1,21 +1,17 @@
-const { MongoClient } = require('mongodb');
-const mongoUrl = process.env.MONGO_URL;
-const dbName = process.env.DB_NAME;
+const mongoose = require('mongoose');
 
-let db;
-
-const connectDB = async () => {
-  if (!db) {
-    const client = new MongoClient(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
-    await client.connect();
-    db = client.db(dbName);
+const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  password: {
+    type: String,
+    required: true
   }
-  return db;
-};
+});
 
-const getUserCollection = async () => {
-  const database = await connectDB();
-  return database.collection('users');
-};
+const User = mongoose.model('User', userSchema);
 
-module.exports = { getUserCollection };
+module.exports = User;

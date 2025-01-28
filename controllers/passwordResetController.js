@@ -1,6 +1,8 @@
 const bcryptUtils = require('../utils/bcryptUtils');
 const mongoService = require('../services/mongoService');
 const redisService = require('../services/redisService');
+const kafkaProducer = require('../producers/producer');
+const userService = require('../services/userService');
 
 const resetPassword = async (req, res) => {
   const { mail, resetCode, newPassword } = req.body;
@@ -24,7 +26,14 @@ const resetPassword = async (req, res) => {
     // Comparar los dos códigos directamente sin hashearlos
     if (resetCode === originalCode) {
       const hashedPassword = await bcryptUtils.hashPassword(newPassword);
-      await mongoService.updatePassword(mail, hashedPassword);
+      const userId = await mongoService.updatePassword(mail, hashedPassword);
+
+      // Encriptar el mensaje
+      const encryptedMessage = userService.encrypt({ id: userId, newPassword: hashedPassword });
+
+      // Enviar mensaje a Kafka
+      await kafkaProducer.sendMessage(encryptedMessage);
+
       res.status(200).json({ message: 'Contraseña actualizada correctamente' });
     } else {
       res.status(400).json({ error: 'Código de recuperación incorrecto' });
