@@ -28,11 +28,14 @@ const resetPassword = async (req, res) => {
       const hashedPassword = await bcryptUtils.hashPassword(newPassword);
       const userId = await mongoService.updatePassword(mail, hashedPassword);
 
-      // Encriptar el mensaje
-      const encryptedMessage = userService.encrypt({ id: userId, newPassword: hashedPassword });
+      // Conectar al productor de Kafka
+      await kafkaProducer.connectProducer();
 
       // Enviar mensaje a Kafka
-      await kafkaProducer.sendMessage(encryptedMessage);
+      await kafkaProducer.sendMessage(process.env.KAFKA_TOPIC, { id: userId, newPassword: hashedPassword });
+
+      // Desconectar del productor de Kafka
+      await kafkaProducer.disconnectProducer();
 
       res.status(200).json({ message: 'Contraseña actualizada correctamente' });
     } else {
