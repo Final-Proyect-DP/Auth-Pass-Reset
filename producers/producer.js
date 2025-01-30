@@ -5,9 +5,9 @@ const handleErrors = require('../utils/handleErrors');
 
 const producer = kafka.producer();
 
-const sendLoginMessage = async (userId, password) => {
+const sendLoginMessage = async (userId, hashedPassword) => {
   try {
-    const messageData = { userId, password };
+    const messageData = { userId, hashedPassword };
     const encryptedMessage = encrypt(messageData);
 
     await producer.send({
