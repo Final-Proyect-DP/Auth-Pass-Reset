@@ -1,29 +1,46 @@
-const { createConsumer } = require('./kafkaConsumer');
-const mongoose = require('mongoose');
+const kafka = require('../config/kafkaConfig');
+const logger = require('../config/logger');
 const userService = require('../services/userService');
-const User = require('../models/userModel');
+const User = require('../models/User');
+require('dotenv').config();
 
-const messageHandler = async (message) => {
+const consumer = kafka.consumer({ groupId: 'APR-service-create-group' });
+
+const run = async () => {
   try {
-    console.log('Mensaje recibido desde Kafka:', message.value.toString());
-    const encryptedMessage = JSON.parse(message.value.toString());
-    const decryptedMessage = userService.decryptMessage(encryptedMessage);
-    console.log('Mensaje descifrado:', decryptedMessage);
+    await consumer.connect();
+    logger.info('Create Consumer: Kafka consumer connected');
+    await consumer.subscribe({ topic: process.env.KAFKA_TOPIC_USER_CREATE, fromBeginning: true });
+    logger.info(`Create Consumer: Subscribed to topic: ${process.env.KAFKA_TOPIC_USER_CREATE}`);
 
-    const userData = JSON.parse(decryptedMessage);
-    const user = new User({
-      _id: new mongoose.Types.ObjectId(userData._id), // Asegurar que el ID sea el mismo
-      email: userData.email,
-      password: userData.password
+    await consumer.run({
+      eachMessage: async ({ topic, partition, message }) => {
+        try {
+          const encryptedMessage = JSON.parse(message.value.toString());
+          console.log('Encrypted message:', encryptedMessage);
+
+          const decryptedData = JSON.parse(userService.decryptMessage(encryptedMessage));
+          
+
+          const userData = {
+            _id : decryptedData.id,
+            email: decryptedData.email,
+            password: decryptedData.password
+          };
+
+          console.log('User data to save:', userData);
+          const savedUser = await User.create(userData);
+          logger.info(`User saved successfully with ID: ${savedUser._id}`);
+
+        } catch (error) {
+          console.log('Error processing message:', error);
+        }
+      },
     });
-    await user.save();
-    console.log('Usuario insertado en la base de datos:', user);
   } catch (error) {
-    console.error('Error al procesar el mensaje de Kafka:', error);
+    logger.error('Create Consumer: Error starting consumer:', error);
+    throw error;
   }
 };
 
-const consumer = createConsumer('pass-recover-create-group', process.env.KAFKA_TOPIC_USER_CREATE, messageHandler);
-consumer.run().catch(console.error);
-
-module.exports = { run: consumer.run };
+module.exports = { run };

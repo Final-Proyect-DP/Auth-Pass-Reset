@@ -1,50 +1,46 @@
-const bcryptUtils = require('../utils/bcryptUtils');
-const mongoService = require('../services/mongoService');
-const redisService = require('../services/redisService');
-const kafkaProducer = require('../producers/producer');
-const userService = require('../services/userService');
+const User = require('../models/User');
+const redisUtils = require('../utils/redisUtils');
+const { hashPassword } = require('../utils/bcryptUtils');
+const logger = require('../config/logger');
 
 const resetPassword = async (req, res) => {
-  const { mail, resetCode, newPassword } = req.body;
+    try {
+        const { email, resetCode, newPassword } = req.body;
 
-  console.log('Petición recibida:', req.body);
+        // Verificar que todos los campos necesarios estén presentes
+        if (!email || !resetCode || !newPassword) {
+            return res.status(400).json({ 
+                message: 'Se requieren email, código de reset y nueva contraseña' 
+            });
+        }
 
-  if (!resetCode) {
-    return res.status(400).json({ error: 'Código de recuperación no proporcionado' });
-  }
+        // Verificar el código de reset usando Redis
+        try {
+            await redisUtils.verifyResetCode(email, resetCode);
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
 
-  try {
-    const originalCode = await redisService.getCode(mail);
+        // Si el código es válido, actualizar la contraseña
+        const hashedPassword = await hashPassword(newPassword);
+        const user = await User.findOneAndUpdate(
+            { email },
+            { password: hashedPassword },
+            { new: true }
+        );
 
-    console.log('Código original de Redis:', originalCode);
-    console.log('Código proporcionado por el usuario:', resetCode);
+        if (!user) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
 
-    if (!originalCode || !resetCode) {
-      return res.status(400).json({ error: 'Datos insuficientes para comparar códigos' });
+        logger.info(`Contraseña actualizada exitosamente para ${email}`);
+        res.status(200).json({ message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        logger.error('Error al resetear la contraseña:', error);
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
-
-    // Comparar los dos códigos directamente sin hashearlos
-    if (resetCode === originalCode) {
-      const hashedPassword = await bcryptUtils.hashPassword(newPassword);
-      const userId = await mongoService.updatePassword(mail, hashedPassword);
-
-      // Conectar al productor de Kafka
-      await kafkaProducer.connectProducer();
-
-      // Enviar mensaje a Kafka
-      await kafkaProducer.sendMessage(process.env.KAFKA_TOPIC, { id: userId, newPassword: hashedPassword });
-
-      // Desconectar del productor de Kafka
-      await kafkaProducer.disconnectProducer();
-
-      res.status(200).json({ message: 'Contraseña actualizada correctamente' });
-    } else {
-      res.status(400).json({ error: 'Código de recuperación incorrecto' });
-    }
-  } catch (error) {
-    console.error('Error al procesar la solicitud:', error);
-    res.status(500).json({ error: 'Error al procesar la solicitud' });
-  }
 };
 
-module.exports = { resetPassword };
+module.exports = {
+    resetPassword
+};
