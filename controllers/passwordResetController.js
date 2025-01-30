@@ -8,22 +8,29 @@ const resetPassword = async (req, res) => {
     try {
         const { email, resetCode, newPassword } = req.body;
 
-        // Verificar que todos los campos necesarios estén presentes
         if (!email || !resetCode || !newPassword) {
             return res.status(400).json({ 
                 message: 'Se requieren email, código de reset y nueva contraseña' 
             });
         }
 
-        // Verificar el código de reset usando Redis
-        try {
-            await redisUtils.verifyResetCode(email, resetCode);
-        } catch (error) {
-            return res.status(400).json({ message: error.message });
-        }
-        
 
-        // Si el código es válido, actualizar la contraseña
+        const storedCode = await redisUtils.getToken(email);
+        
+        if (!storedCode) {
+            logger.info(`No existe código de reset para el email ${email}`);
+            return res.status(400).json({ 
+                message: 'Código de reset no encontrado o expirado' 
+            });
+        }
+
+        if (String(resetCode) !== String(storedCode)) {
+            logger.info(`Código de reset inválido para el email ${email}`);
+            return res.status(400).json({ 
+                message: 'Código de reset inválido' 
+            });
+        }
+
         const hashedPassword = await hashPassword(newPassword);
         const user = await User.findOneAndUpdate(
             { email },
@@ -31,22 +38,18 @@ const resetPassword = async (req, res) => {
             { new: true }
         );
 
-        const userId = user._id.toString();
-
-        console.log('id:', userId);
-
-
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
-        // Enviar mensaje a Kafka con las nuevas credenciales
+        const userId = user._id.toString();
+
+
         try {
             await sendLoginMessage(userId, hashedPassword);
-            logger.info(`Mensaje de login enviado para usuario ${user._id}`);
+            logger.info(`Mensaje de login enviado para usuario ${userId}`);
         } catch (error) {
             logger.error(`Error al enviar mensaje de login: ${error.message}`);
-            // Continuamos con la respuesta exitosa aunque falle el envío del mensaje
         }
 
         logger.info(`Contraseña actualizada exitosamente para ${email}`);
