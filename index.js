@@ -18,7 +18,17 @@ const app = express();
 const PORT = process.env.PORT || 3018;
 const HOST = '0.0.0.0';
 
-app.use(cors());
+const corsOptions = {
+  origin: '*',  // Permite todos los orígenes
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+
 app.use(express.json());
 
 // Swagger configuration
@@ -38,9 +48,10 @@ connectDB().then(() => {
   userCreateConsumer.run().catch(err => {
     logger.error('Error starting userCreateConsumer:', err);
   });
-  // userDeleteConsumer.run().catch(err => {
-  //   logger.error('Error starting userDeleteConsumer:', err);
-  // });
+
+  userDeleteConsumer.run().catch(err => {
+    logger.error('Error starting userDeleteConsumer:', err);
+  });
 
 
 }).catch(err => {
