@@ -1,59 +1,68 @@
+// External dependencies imports
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsDoc = require('swagger-jsdoc');
+
+// Local file imports
 const connectDB = require('./config/dbConfig');
 const logger = require('./config/logger');
 const userCreateConsumer = require('./consumers/userCreateConsumer');
 const userDeleteConsumer = require('./consumers/userDeleteConsumer');
-const passwordResetRoutes = require('./routes/passwordResetRoutes'); // Agregar esta línea
+const passwordResetRoutes = require('./routes/passwordResetRoutes');
 
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsDoc = require('swagger-jsdoc');
-
-// Ensure dotenv is loaded before importing swaggerOptions
+// Initial configuration
 dotenv.config();
 const swaggerOptions = require('./config/swaggerConfig');
-
 const app = express();
 const PORT = process.env.PORT || 3018;
 const HOST = '0.0.0.0';
 
+// CORS configuration
 const corsOptions = {
-  origin: '*',  // Permite todos los orígenes
+  origin: '*',  // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
 };
 
+// Middleware
 app.use(cors(corsOptions));
-
-
 app.use(express.json());
 
-// Swagger configuration
+// Swagger documentation
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-// Agregar las rutas de password reset
+// Routes
 app.use('/api/password-reset', passwordResetRoutes);
-
-connectDB().then(() => {
-  const server = app.listen(PORT, HOST, () => {
-    logger.info(`Server running on http://${HOST}:${PORT}`);
-    logger.info(`Swagger documentation available at http://${HOST}:${PORT}/api-docs`);
-  });
-
-  // Start Kafka consumers
-  userCreateConsumer.run().catch(err => {
-    logger.error('Error starting userCreateConsumer:', err);
-  });
-
-  userDeleteConsumer.run().catch(err => {
-    logger.error('Error starting userDeleteConsumer:', err);
-  });
-
-
-}).catch(err => {
-  logger.error('Server error:', err.message, err.stack);
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', service: 'auth-pass-reset' });
 });
+
+// Server and services initialization
+connectDB()
+  .then(() => {
+    const server = app.listen(PORT, HOST, () => {
+      logger.info(`Server running on http://${HOST}:${PORT}`);
+      logger.info(`Swagger documentation available at http://${HOST}:${PORT}/api-docs`);
+    });
+
+    const initializeConsumers = async () => {
+      try {
+        await userDeleteConsumer.run();
+        await userCreateConsumer.run();
+        logger.info('Kafka consumers initialized successfully! 🚀');
+      } catch (err) {
+        logger.error('Error starting Kafka consumers:', err);
+        server.close();
+      }
+    };
+
+    initializeConsumers();
+  })
+  .catch(err => {
+    logger.error('Server error:', err.message);
+  });

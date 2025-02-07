@@ -20,8 +20,8 @@ jobs:
         env:
           PORT: ${{ secrets.PORT }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          HOST: ${{ secrets.HOST }}
           KAFKA_HOST: ${{ secrets.KAFKA_HOST }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
@@ -32,9 +32,9 @@ jobs:
           KAFKA_TOPIC_PASS_RESET: ${{ secrets.KAFKA_TOPIC_PASS_RESET }}
         run: |
           echo "PORT=${PORT}" > .env
+          echo "HOST=${HOST}" >> .env
           echo "MONGODB_URI=${MONGODB_URI}" >> .env
-          echo "REDIS_HOST=${REDIS_HOST}" >> .env
-          echo "REDIS_PORT=${REDIS_PORT}" >> .env
+          echo "REDIS_URL=${REDIS_URL}" >> .env
           echo "KAFKA_HOST=${KAFKA_HOST}" >> .env
           echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >> .env
           echo "ENCRYPTION_IV=${ENCRYPTION_IV}" >> .env
@@ -77,7 +77,7 @@ jobs:
     strategy:
       matrix:
         ec2_instance: 
-          - ec2-44-202-115-65.compute-1.amazonaws.com
+          - ec2-3-233-114-192.compute-1.amazonaws.com
 
     steps:
       - name: Deploy Container
