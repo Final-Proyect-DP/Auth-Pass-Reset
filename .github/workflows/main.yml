@@ -1,5 +1,3 @@
-
-
 name: Deploy to production Environment
 
 on:
@@ -90,7 +88,7 @@ jobs:
         with:
           host: ${{ matrix.ec2_instance }}
           username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY_PROD1 }}
           port: 22
           timeout: "120s"
           script: |
