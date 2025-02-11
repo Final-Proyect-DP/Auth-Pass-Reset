@@ -1,16 +1,23 @@
-name: Deploy to Staging Environment
+
+
+name: Deploy to production Environment
 
 on:
-  push:
-    branches: [staging]
+  pull_request:
+    types: [closed] 
+    branches: [main]
 
 jobs:
   build_docker_image:
+    if: github.event.pull_request.merged == true
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
 
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
+
+
+
 
     steps:
       - name: Checkout code
@@ -19,13 +26,12 @@ jobs:
       - name: edit .env file
         env:
           PORT: ${{ secrets.PORT }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          HOST: ${{ secrets.HOST }}
-          KAFKA_HOST: ${{ secrets.KAFKA_HOST }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI_PROD }}
+          REDIS_URL: ${{ secrets.REDIS_URL_PROD }}
+          HOST: ${{ secrets.HOST_PROD }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
-          KAFKA_BROKER: ${{ secrets.KAFKA_BROKER }}
+          KAFKA_BROKER: ${{ secrets.KAFKA_BROKER_PROD }}
           KAFKA_CLIENT_ID: ${{ secrets.KAFKA_CLIENT_ID }}
           KAFKA_TOPIC_USER_CREATE: ${{ secrets.KAFKA_TOPIC_USER_CREATE }}
           KAFKA_TOPIC_DELETE: ${{ secrets.KAFKA_TOPIC_DELETE }}
@@ -35,7 +41,6 @@ jobs:
           echo "HOST=${HOST}" >> .env
           echo "MONGODB_URI=${MONGODB_URI}" >> .env
           echo "REDIS_URL=${REDIS_URL}" >> .env
-          echo "KAFKA_HOST=${KAFKA_HOST}" >> .env
           echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >> .env
           echo "ENCRYPTION_IV=${ENCRYPTION_IV}" >> .env
           echo "KAFKA_BROKER=${KAFKA_BROKER}" >> .env
@@ -59,14 +64,14 @@ jobs:
         with:
           images: byvoxel/auth-pass-reset
           tags: |
-            type=raw,value=staging
+            type=raw,value=production
           
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: byvoxel/auth-pass-reset:staging
+          tags: byvoxel/auth-pass-reset:production
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -77,7 +82,7 @@ jobs:
     strategy:
       matrix:
         ec2_instance: 
-          - ec2-3-233-114-192.compute-1.amazonaws.com
+          - ec2-52-202-22-209.compute-1.amazonaws.com
 
     steps:
       - name: Deploy Container
@@ -90,13 +95,13 @@ jobs:
           timeout: "120s"
           script: |
             set -e
-            echo "Deploying image: byvoxel/auth-pass-reset:staging"
+            echo "Deploying image: byvoxel/auth-pass-reset:production"
             sudo docker stop auth-pass-reset || true
             sudo docker rm auth-pass-reset || true
-            sudo docker pull byvoxel/auth-pass-reset:staging
+            sudo docker pull byvoxel/auth-pass-reset:production
             sudo docker run -d \
               --name auth-pass-reset \
               -p 3013:3013 \
               --restart unless-stopped \
-              byvoxel/auth-pass-reset:staging
+              byvoxel/auth-pass-reset:production
             sudo docker system prune -af --volumes || true
